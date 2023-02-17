@@ -71,12 +71,14 @@ bpf docker: kernel_drivers_examples/x86/bpf
 
 ## 编译qemu
 
-copy make-deb.sh to qemu/
-copy control to qemu/debbuild/DEBIAN/
+checkout qemu code
+
+	git checkout v5.0.0-rc4 -b v5p0p0rc4
+	git apply 0001-Add-newdev-for-hyperupcall.patch
 
 Config and compile qemu(virtopt/dockerfile/Dockerfile)
 
-	drun -v $PWD/qemu:/code jammy:qemu /bin/bash
+	drun -v /path/to/qemu:/code jammy:qemu /bin/bash
 	./make-deb.sh
 
 Run qemu
