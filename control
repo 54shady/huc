@@ -1,0 +1,7 @@
+Package: newdevqemu
+Architecture: amd64
+Maintainer: Debian QEMU Maintainers
+Priority: optional
+Homepage: http://www.zeroway.com/
+Description: <Support newdev for qemu>
+Version:0.1

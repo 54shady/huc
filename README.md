@@ -62,26 +62,13 @@ bpf docker: kernel_drivers_examples/x86/bpf
 
 ## 编译qemu
 
-Config qemu
+copy make-deb.sh to qemu/
+copy control to qemu/debbuild/DEBIAN/
 
-./configure \
-	--target-list="x86_64-softmmu" \
-	--enable-debug \
-	--disable-docs \
-	--disable-capstone \
-	--disable-nettle \
-	--disable-gnutls \
-	--disable-gcrypt \
-	--extra-cflags="-O0" \
-	--enable-trace-backends=ftrace
+Config and compile qemu(virtopt/dockerfile/Dockerfile)
 
-	--with-git-submodules=ignore \
-
-Comile qemu
-
-	make all -j$(nproc) CONFIG_NEWDEV=y
-
-	make all -j 9 CONFIG_NEWDEV=y CONFIG_VIRTFS=y CONFIG_VIRTIO_9P=y
+	drun -v $PWD/qemu:/code jammy:qemu /bin/bash
+	./make-deb.sh
 
 Run qemu
 
