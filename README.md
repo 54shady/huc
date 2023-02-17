@@ -1,5 +1,8 @@
 # HyperUpCall
 
+host: ubuntu 22.04
+guest: ubutnu 20.04
+
 ## 代码实现原理
 
 1. 虚拟设备
