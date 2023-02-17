@@ -26,7 +26,20 @@ host中运行 eBPF-injection/host_interface/injectProgram.c (TCP client)向服�
 	wrapper-test.py
 		test.py
 			injectProgram.sh(run injectProgram)
-				将bpfProg编译产生的文件通过网络发送到虚拟设备的缓存中
+				1. 将bpfProg编译产生的文件通过网络发送到虚拟设备的缓存中
+				2. 虚拟设备根据bitecode的header中的type类型来判断需要如何处理
+					虚拟设备发送中断给guest来通知收取bpf bitecode
+					中断中通过irq_status来告知guest driver是什么中断
+				3. driver中断处理函数进行处理
+					中断唤醒等待队列上的程序read函数
+				4. daemon_bpf一启动就会调用系统调用read等待驱动返回数据
+					加载bpf bitecode到内核后
+					daemon进行bpf map update, 再调用ioctl set_affinity
+				5. 回到驱动中处理daemon的ioctl请求
+					iowrite32对设备进行写操作,命令码NEWDEV_REG_SETAFFINITY
+				6. 虚拟设备处理该写操作请求
+					对应的set_affinity,在虚拟设备中进行系统调用,来实现
+					if (sched_setaffinity(cpu->thread_id, SET_SIZE, set) == -1){
 
 在guest中运行了守护程序daemon_bpf来读取虚拟设备的缓存
 1. 将主机发送过来的bpfProg程序保存到本地并加载运行
@@ -40,37 +53,12 @@ host中运行 eBPF-injection/host_interface/injectProgram.c (TCP client)向服�
 	make all
 	make kernel
 	make daemon
+	make ...
 
 ------
 
-bpf docker: /home/zeroway/github/kernel_drivers_examples/x86/bpf
+bpf docker: kernel_drivers_examples/x86/bpf
 使用ubuntu20.04 docker编译 daemon_bpf和myprog.c
-
-compile kernel
-
-	docker run --rm -it --privileged \
-		--entrypoint=/code/compile-kernel.sh \
-		-v $PWD:/code \
-		-v $PWD/linux-5.4.0:/usr/src/linux bpf2004
-
-compile driver
-
-	docker run --rm -it --privileged \
-		--entrypoint=/code/compile.sh \
-		-v $PWD/eBPF-injection/shared/driver:/code \
-		-v $PWD/linux-5.4.0:/usr/src/linux bpf2004
-
-compile bytecode and daemon
-
-	cp $PWD/eBPF-injection/Makefile $PWD/linux-5.4.0/samples/bpf/
-	cp $PWD/eBPF-injection/shared/daemon_bpf/daemon_bpf.c $PWD/linux-5.4.0/samples/bpf/
-	cp $PWD/eBPF-injection/shared/daemon_bpf/bpf_injection_msg.h $PWD/linux-5.4.0/samples/bpf/
-	cp $PWD/eBPF-injection/bpfProg/myprog.c $PWD/linux-5.4.0/samples/bpf/
-
-	docker run --rm -it --privileged \
-		--entrypoint=/code/compile.sh \
-		-v $PWD:/code \
-		-v $PWD/linux-5.4.0:/usr/src/linux bpf2004
 
 ## 编译qemu
 
