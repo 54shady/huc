@@ -58,6 +58,12 @@ host中运行 eBPF-injection/host_interface/injectProgram.c (TCP client)向服�
 	make daemon
 	make ...
 
+编译完内核后,在容器中make install安装内核到容器的/boot
+
+	tar cvf boot.tar /boot/*
+
+然后将这个boot.tar解压到guest中即可更新guest内核
+
 ------
 
 bpf docker: kernel_drivers_examples/x86/bpf
@@ -75,15 +81,14 @@ Config and compile qemu(virtopt/dockerfile/Dockerfile)
 
 Run qemu
 
-/root/qemu-system-x86_64 \
-
-/root/qemu/x86_64-softmmu/qemu-system-x86_64 \
+/usr/local/bin/qemu-system-x86_64 \
         -serial mon:stdio \
         -drive file=/root/hyperupcall/ubt2004.qcow2,format=qcow2 \
         -enable-kvm -m 2G -smp 2 \
         -device e1000,netdev=ssh \
         -netdev user,id=ssh,hostfwd=tcp::2222-:22 \
 		-vnc 0.0.0.0:0 \
+		-virtfs local,id=sfs,path=/root/hyperupcall/eBPF-injection/shared,security_model=passthrough,mount_tag=shared \
         -device newdev
 
 ## 准备运行环境
@@ -98,8 +103,8 @@ Run qemu
 
 1. 在guest中安装驱动
 
-	tar xvf all.tar
-	cd hyperUpCall/
+	cd /root/
+	mount -t 9p -o trans=virtio,version=9p2000.L shared shared
 	./insert_driver.sh
 	./daemon_bpf
 

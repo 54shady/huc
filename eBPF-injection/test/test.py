@@ -173,7 +173,7 @@ time.sleep(1)
 f = open(path, "w")
 for i in range(n_tests):
 	startAndStopSerialization(serial_percent, duration_each)	
-	with c.cd('/root/eBPF-injection/shared/simplified-spscq'):
+	with c.cd('/root/shared/simplified-spscq'): # run spscq on guest
 		r = c.run("python3 affinity_test.py " + str(duration_each), hide=True)
 		f.write(r.stdout)		
 		if i != n_tests-1:

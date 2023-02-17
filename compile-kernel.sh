@@ -12,6 +12,16 @@ make defconfig
 ./scripts/config -e CONFIG_BPF_SYSCALL
 ./scripts/config -e CONFIG_DEBUG_INFO_BTF
 ./scripts/config -d CONFIG_DEBUG_INFO_REDUCED
+./scripts/config -e CONFIG_NET_9P
+./scripts/config -e CONFIG_NET_9P_VIRTIO
+./scripts/config -e CONFIG_NET_9P_DEBUG
+./scripts/config -e CONFIG_9P_FS
+./scripts/config -e CONFIG_9P_FS_POSIX_ACL
+./scripts/config -e CONFIG_PCI
+./scripts/config -e CONFIG_VIRTIO_PCI
+./scripts/config -e CONFIG_PCI
+./scripts/config -e CONFIG_VIRTIO_PCI
+./scripts/config -e CONFIG_PCI_HOST_GENERIC
 yes "" | make oldconfig
 make headers_install
 make -j$(nproc) \

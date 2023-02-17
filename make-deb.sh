@@ -8,6 +8,7 @@ cd build && \
 	--disable-docs \
 	--disable-capstone \
 	--disable-nettle \
+	--enable-virtfs \
 	--disable-gnutls \
 	--disable-gcrypt \
 	--extra-cflags="-O0" \
