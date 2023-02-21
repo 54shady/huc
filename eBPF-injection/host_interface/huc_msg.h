@@ -35,7 +35,7 @@ struct huc_msg_t {
 	void *payload;
 };
 
-struct huc_msg_t prepare_huc_message(const char *path)
+struct huc_msg_t prepare_huc_message(const char *bytecode)
 {
 	struct huc_msg_t mymsg;
 	int len;
@@ -43,7 +43,7 @@ struct huc_msg_t prepare_huc_message(const char *path)
 
 	mymsg.header.version = DEFAULT_VERSION;
 	mymsg.header.type = PROGRAM_INJECTION;
-	fp = fopen(path, "r");
+	fp = fopen(bytecode, "r");
 	if (fp)
 	{
 		fseek(fp, 0, SEEK_END);

@@ -36,7 +36,13 @@ int main(int argc, char *argv[])
 	struct sockaddr_in servername;
 	struct huc_msg_t mymsg;
 
-	mymsg = prepare_huc_message("/root/hyperupcall/eBPF-injection/bpfProg/myprog.o");
+	if (argc <= 1)
+	{
+		printf("%s <bytecode>\n", argv[0]);
+		exit(EXIT_SUCCESS);
+	}
+
+	mymsg = prepare_huc_message(argv[1]);
 
 	sock = socket(PF_INET, SOCK_STREAM, 0);
 	if (sock < 0)
@@ -54,6 +60,7 @@ int main(int argc, char *argv[])
 
 	send(sock, &(mymsg.header), sizeof(struct huc_msg_header), 0);
 	send(sock, mymsg.payload, mymsg.header.payload_len, 0);
+	printf("Header and payload send Successfully\n");
 
 	free(mymsg.payload);
 	close(sock);
