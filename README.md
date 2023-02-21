@@ -90,7 +90,7 @@ Run qemu
 			-netdev user,id=ssh,hostfwd=tcp::2222-:22 \
 			-vnc 0.0.0.0:0 \
 			-virtfs local,id=sfs,path=/root/hyperupcall/eBPF-injection/shared,security_model=passthrough,mount_tag=shared \
-			-device newdev
+			-device newdev -device hucdev
 
 ## 测试
 
