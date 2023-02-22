@@ -63,7 +63,11 @@ static irqreturn_t irq_handler(int irq, void *dev)
 	irqreturn_t ret;
 	u32 irq_status;
 
-	/* 比对下是否为该设备的中断 */
+	/*
+	 * 比对下是否为该设备的中断
+	 * 因为中断配置为共享中断
+	 * grep huc_irq_handler /proc/interrupts
+	 */
 	n = *(int *)dev;
 	if (n == major)
 	{
@@ -112,9 +116,10 @@ static int huc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto error;
 	}
 
-	printk("aaa:pdev-irq = %d\n", pdev->irq);
-	pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, (u8 *)&(pdev->irq));
-	printk("bbb:pdev-irq = %d\n", pdev->irq);
+	/*
+	 * no need to get irq number manually
+	 * pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, (u8 *)&(pdev->irq));
+	 */
 	if (devm_request_irq(&pdev->dev, pdev->irq, irq_handler, IRQF_SHARED, "huc_irq_handler", &major) < 0)
 	{
 		dev_err(&(pdev->dev), "request_irq\n");
@@ -132,10 +137,8 @@ static void huc_pci_remove(struct pci_dev *pdev)
 {
 	pr_info("remove\n");
 
-	pci_release_selected_regions(pdev, HUCDEV_BUF_PCI_BAR);
-
+	pci_release_region(pdev, HUCDEV_BUF_PCI_BAR);
 	iounmap(bufmmio);
-	//free_irq(pdev->irq, NULL);
 	unregister_chrdev(major, HUCDEV_NAME);
 
 	return;
