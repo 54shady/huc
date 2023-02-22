@@ -15,12 +15,16 @@ driver:
 daemon:
 	cp ${PWD}/eBPF-injection/Makefile ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/eBPF-injection/shared/daemon_bpf/daemon_bpf.c ${PWD}/linux-5.4.0/samples/bpf/
+	cp ${PWD}/eBPF-injection/shared/daemon_bpf/daemon.c ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/eBPF-injection/shared/daemon_bpf/bpf_injection_msg.h ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/eBPF-injection/bpfProg/myprog.c ${PWD}/linux-5.4.0/samples/bpf/
 	docker run --rm -it --privileged \
 		--entrypoint=/code/compile.sh \
 		-v ${PWD}:/code \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
+
+	cp ${PWD}/linux-5.4.0/samples/bpf/daemon_bpf ${PWD}/eBPF-injection/shared/daemon_bpf/
+	cp ${PWD}/linux-5.4.0/samples/bpf/daemon ${PWD}/eBPF-injection/shared/daemon_bpf/
 
 host:
 	make -C ${PWD}/eBPF-injection/host_interface/

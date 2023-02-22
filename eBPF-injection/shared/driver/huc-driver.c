@@ -19,17 +19,85 @@
 
 static int major;
 
+#if 0
 static loff_t huc_llseek(struct file *filp, loff_t off, int whence)
 {
 	pr_info("llseek\n");
 
 	return 0;
 }
+#endif
+/*
+ * flag = 1: read payload
+ * flag = 2: read header
+ */
+static int flag = 0;
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+static int payload_left;
+static void __iomem *bufmmio;
 
 static ssize_t huc_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
 {
-	pr_info("read\n");
-	return 0;
+	ssize_t ret;
+	/* 因为pci的buf是按u32来存储的 */
+	u32 kbuf;
+	struct bpf_injection_msg_header myheader;
+
+	/* 没有可读取的数据时睡眠在这 */
+	wait_event_interruptible(wq, flag >=1);
+
+	printk("%s, %d\n", __FUNCTION__, __LINE__);
+	/*
+	 * 1. 读取的偏移量要按4字节对齐,否则返回
+	 * 2. 读取的长度是0也返回
+	 */
+	if (*off % 4 || len == 0)
+	{
+		ret = 0;
+	}
+	else
+	{
+		/* 从偏离地址读取4个字节 */
+		kbuf = ioread32(bufmmio + *off);
+
+		/* 读取头部信息 */
+		if (flag == 2)
+		{
+			memcpy(&myheader, &kbuf, sizeof(kbuf));
+			pr_info("  Version:%u\n  Type:%u\n  Payload_len:%u\n", myheader.version, myheader.type, myheader.payload_len);
+
+			/* 保存下payload的长度并跳转到读取payload的阶段 */
+			payload_left = myheader.payload_len;
+			flag = 1;
+		}
+		else if (flag == 1)
+		{
+			/*
+			 * 每次更新下剩余的payload的长度
+			 * 因为guest应用每次读取len长度payload
+			 */
+			payload_left -= len;
+
+			if (payload_left <= 0)
+				flag = 0; /* 读取结束 */
+		}
+
+		/*
+		 * 将每次读取的数据返回到用户空间
+		 * 所以这里建议用户空间每次按4字节读取
+		 */
+		if (copy_to_user(buf, (void *)&kbuf, 4))
+		{
+			ret = -EFAULT;
+		}
+		else
+		{
+			ret = len;
+			*off += 4;
+		}
+	}
+
+	return ret;
 }
 
 static ssize_t huc_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
@@ -49,13 +117,11 @@ static long huc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  * We use the fact that every IO is aligned to 4 bytes. Misaligned reads means EOF. */
 static struct file_operations fops = {
 	.owner   = THIS_MODULE,
-	.llseek  = huc_llseek,
+	.llseek  = generic_file_llseek,
 	.read    = huc_read,
 	.write   = huc_write,
 	.unlocked_ioctl = huc_ioctl,
 };
-
-static void __iomem *bufmmio;
 
 static irqreturn_t irq_handler(int irq, void *dev)
 {
@@ -79,6 +145,14 @@ static irqreturn_t irq_handler(int irq, void *dev)
 		{
 			case PROGRAM_INJECTION:
 				pr_info("PROGRAM_INJECTION irq handler\n");
+				flag = 2;
+
+				/*
+				 * 应用程序read的时候会休眠在等待队列上等待数据到来
+				 * 这里唤醒调用read的应用程序
+				 * 通知其数据到来接收数据
+				 */
+				wake_up_interruptible(&wq);
 				break;
 		}
 		/* Must do this ACK, or else the interrupts just keeps firing. */

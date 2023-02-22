@@ -54,6 +54,7 @@ hostprogs-y += xdp_sample_pkts
 hostprogs-y += ibumad
 hostprogs-y += hbm
 hostprogs-y += daemon_bpf
+hostprogs-y += daemon
 
 # Libbpf dependencies
 LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
@@ -66,6 +67,7 @@ sockex1-objs := sockex1_user.o
 sockex2-objs := sockex2_user.o
 sockex3-objs := bpf_load.o sockex3_user.o
 daemon_bpf-objs := bpf_load.o daemon_bpf.o
+daemon-objs := bpf_load.o daemon.o
 tracex1-objs := bpf_load.o tracex1_user.o
 tracex2-objs := bpf_load.o tracex2_user.o
 tracex3-objs := bpf_load.o tracex3_user.o
