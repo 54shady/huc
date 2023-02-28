@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <signal.h>
+#include <time.h>
 
 #include "bpf_injection_msg.h"
 
@@ -111,6 +112,11 @@ int main(int argc, char *argv[])
 	struct bpf_injection_msg_t mymsg;
 	int pid;
 	int child_pid = -1;
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = 50000000L;
+	uint64_t value = 0;
+	uint32_t index = 0;
 
 	int fd = open(HUC_DEV_NODE, O_RDWR);
 	if (fd < 0)
@@ -180,12 +186,21 @@ int main(int argc, char *argv[])
 				}
 				printf("Load bytecode Done\n");
 				printf("map_fd[0] = %d\n", map_fd[0]);
+
+				sleep(1);
+
 				while (1)
 				{
+					nanosleep(&ts, NULL);
+					bpf_map_lookup_elem(map_fd[0], &index, &value);
 					/* child main loop do something */
-					sleep(1);
+					printf("Index_%u = %ld\n", index, value);
+					/* value += 2; */
+					/* bpf_map_update_elem(map_fd[0], &index, &value, BPF_ANY); */
 				}
-
+				break;
+			default:
+				printf("Unrecognized bpf_injection_message type (%d).\n", mymsg.header.type);
 				break;
 		}
 	}

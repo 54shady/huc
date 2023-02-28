@@ -25,6 +25,7 @@ daemon:
 
 	cp ${PWD}/linux-5.4.0/samples/bpf/daemon_bpf ${PWD}/eBPF-injection/shared/daemon_bpf/
 	cp ${PWD}/linux-5.4.0/samples/bpf/daemon ${PWD}/eBPF-injection/shared/daemon_bpf/
+	cp ${PWD}/linux-5.4.0/samples/bpf/myprog.o ${PWD}/eBPF-injection/bpfProg/
 
 host:
 	make -C ${PWD}/eBPF-injection/host_interface/

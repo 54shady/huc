@@ -26,7 +26,7 @@ def prologue(vcpu_pinned, host_load, serial_percent, duration_each):
 
 def isBpfDaemonRunning(txt):
 	for item in txt.split("\n"):
-		if "daemon_bpf" in item:
+		if "daemon_bpf" or "daemon" in item:
 			return 1
 	return 0
 
