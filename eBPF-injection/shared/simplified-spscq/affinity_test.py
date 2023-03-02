@@ -11,5 +11,7 @@ parser.add_argument('duration', metavar='d', type=int, nargs=1, default=30,
 args = parser.parse_args()
 
 	# Echo process passes password to the sudo timeout ./spscq
-echo_process = subprocess.Popen(["echo", "p"], stdout=subprocess.PIPE)
-subprocess.call(["sudo", "-S", "timeout", "--signal=SIGINT", str(args.duration[0]), "./spscq"], stdin=echo_process.stdout)
+#echo_process = subprocess.Popen(["echo", "p"], stdout=subprocess.PIPE)
+#subprocess.call(["sudo", "-S", "timeout", "--signal=SIGINT", str(args.duration[0]), "./spscq"], stdin=echo_process.stdout)
+
+subprocess.call(["timeout", "--signal=SIGINT", str(args.duration[0]), "./spscq"])
