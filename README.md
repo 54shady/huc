@@ -39,13 +39,20 @@
 				3. driver中断处理函数进行处理
 					中断唤醒等待队列上的程序read函数
 				4. daemon_bpf一启动就会调用系统调用read等待驱动返回数据
-					加载bpf bitecode到内核后
-					daemon进行bpf map update, 再调用ioctl set_affinity
+					加载bpf bitecode到内核后,等待bpfmap的更新
+
+					daemon等待bpfmap数据有变动后,进行bpf map update, 再调用ioctl set_affinity
 				5. 回到驱动中处理daemon的ioctl请求
 					iowrite32对设备进行写操作,命令码NEWDEV_REG_SETAFFINITY
 				6. 虚拟设备处理该写操作请求
 					对应的set_affinity,在虚拟设备中进行系统调用,来实现
 					if (sched_setaffinity(cpu->thread_id, SET_SIZE, set) == -1){
+
+			远程触发guest中的脚本python3 affinity_test.py
+			将会在guest中运行spscq
+			spscq的运行会导致guest中调用到内核的sched_setaffinity
+			此时就会进入到bytecode中运行对应的钩子程序bpf_prog1
+
 
 在guest中运行了守护程序daemon_bpf来读取虚拟设备的缓存
 

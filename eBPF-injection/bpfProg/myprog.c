@@ -70,9 +70,15 @@ int bpf_prog1(struct pt_regs *ctx){
 	u64 cpu_set;
 	u64 *top;
 	u32 index = 0;
+	int pid;
+	char msg[] = "Pid %d Enter\n";
+	char vi[] = "index: %d\n";
 
-	// char fmt[] = "cpu_set %lu\n";
-	// bpf_trace_printk(fmt, sizeof(fmt), cpu_set);
+	pid = bpf_get_current_pid_tgid();
+	bpf_trace_printk(msg, sizeof(msg), pid);
+
+	char fmt[] = "cpu_set %lu\n";
+	bpf_trace_printk(fmt, sizeof(fmt), cpu_set);
 
 	// Read from onst struct cpumask *new_mask (2nd parameter)
 	
@@ -89,6 +95,8 @@ int bpf_prog1(struct pt_regs *ctx){
 	__sync_fetch_and_add(top, 1);
 	index = *top;
 	// bpf_trace_printk(fmt, sizeof(fmt), cpu_set);
+	bpf_trace_printk(vi, sizeof(vi), index);
+
 	bpf_map_update_elem(&values, &index, &cpu_set, 0);
     return 0;    
 }
