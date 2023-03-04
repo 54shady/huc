@@ -192,6 +192,7 @@ int main(int argc, char *argv[])
 				while (1)
 				{
 					nanosleep(&ts, NULL);
+					/* 用户态使用libbpf里的bpf call linux/tools/lib/bpf/bpf.c */
 					bpf_map_lookup_elem(map_fd[0], &index, &value);
 					/* child main loop do something */
 					printf("Index_%u = %ld\n", index, value);
