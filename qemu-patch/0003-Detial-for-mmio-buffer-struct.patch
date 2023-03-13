@@ -1,0 +1,47 @@
+From f1517f17d0b1c6899a1865b970c3b55b2aafc512 Mon Sep 17 00:00:00 2001
+From: zeroway <M_O_Bz@163.com>
+Date: Mon, 13 Mar 2023 14:46:39 +0800
+Subject: [PATCH 3/3] Detial for mmio buffer struct
+
+---
+ hw/misc/hucdev.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/hw/misc/hucdev.c b/hw/misc/hucdev.c
+index 212ba12635..6baf342c14 100644
+--- a/hw/misc/hucdev.c
++++ b/hw/misc/hucdev.c
+@@ -49,7 +49,7 @@
+  * 因为buffer是uint32_t的数组
+  * 所以数据存储在buffer中的偏移量需要按4字节对齐
+  *
+- * +---+--------------------------------+
++ * +---+--------------------------------+<-----buf
+  * | 0 | irq_status [R] / raise_irq [W] |
+  * +---+--------------------------------+
+  * | 1 |          lower_irq [W]         |
+@@ -57,9 +57,9 @@
+  * | 2 |      unspecified/reserved      |
+  * +---+--------------------------------+
+  * | 3 |      unspecified/reserved      |
+- * +---+--------------------------------+
+- * | 4 |                                |
+- * +---+                                |
++ * +---+--------------------------------+<-----buf + 4(myheader)
++ * | 4 |  payload_len | type | version  | guest应用程序读取这段数据需要跳过前4*4 字节
++ * +---+                                | lseek(fd, 16, SEEK_SET)
+  * | 5 |            buffer              |
+  * +---+                                |
+  * |   |                                |
+@@ -329,6 +329,8 @@ static void handle_acceptfd(void *opaque)
+ 
+ 		return;
+ 	}
++
++	/* 从第buf[4]开始保存header */
+ 	myheader = (struct huc_msg_header *)hucdev->buf + 4;
+ 
+ 	/*
+-- 
+2.35.1
+
