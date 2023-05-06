@@ -1,0 +1,4 @@
+*.o
+daemon
+simplified-spscq/spscq
+*.deb

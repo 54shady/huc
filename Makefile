@@ -1,4 +1,10 @@
-all:kernel driver daemon spscq affinity output
+all:qemu kernel drv guest host
+
+qemu:
+	docker run --rm -it --privileged \
+		-v ~/src/qemu:/code \
+		huc
+	cp ~/src/qemu/newdev-qemu.deb guestend/
 
 kernel:
 	docker run --rm -it --privileged \
@@ -6,40 +12,29 @@ kernel:
 		-v ${PWD}:/code \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
 
-driver:
+drv:
 	docker run --rm -it --privileged \
 		--entrypoint=/code/compile.sh \
-		-v ${PWD}/eBPF-injection/shared/driver:/code \
+		-v ${PWD}/guestend/driver:/code \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
 
-daemon:
-	cp ${PWD}/eBPF-injection/Makefile ${PWD}/linux-5.4.0/samples/bpf/
-	cp ${PWD}/eBPF-injection/shared/daemon_bpf/daemon_bpf.c ${PWD}/linux-5.4.0/samples/bpf/
-	cp ${PWD}/eBPF-injection/shared/daemon_bpf/daemon.c ${PWD}/linux-5.4.0/samples/bpf/
-	cp ${PWD}/eBPF-injection/shared/daemon_bpf/bpf_injection_msg.h ${PWD}/linux-5.4.0/samples/bpf/
-	cp ${PWD}/eBPF-injection/bpfProg/myprog.c ${PWD}/linux-5.4.0/samples/bpf/
+guest:
+	cp ${PWD}/guestend/Makefile ${PWD}/linux-5.4.0/samples/bpf/
+	cp ${PWD}/guestend/daemon.c ${PWD}/linux-5.4.0/samples/bpf/
+	cp ${PWD}/guestend/bpf_injection_msg.h ${PWD}/linux-5.4.0/samples/bpf/
+	cp ${PWD}/guestend/bytecode.c ${PWD}/linux-5.4.0/samples/bpf/
 	docker run --rm -it --privileged \
 		--entrypoint=/code/compile.sh \
 		-v ${PWD}:/code \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
-
-	cp ${PWD}/linux-5.4.0/samples/bpf/daemon_bpf ${PWD}/eBPF-injection/shared/daemon_bpf/
-	cp ${PWD}/linux-5.4.0/samples/bpf/daemon ${PWD}/eBPF-injection/shared/daemon_bpf/
-	cp ${PWD}/linux-5.4.0/samples/bpf/myprog.o ${PWD}/eBPF-injection/bpfProg/
-
-host:
-	make -C ${PWD}/eBPF-injection/host_interface/
-
-spscq:
+	cp ${PWD}/linux-5.4.0/samples/bpf/daemon ${PWD}/guestend/
+	cp ${PWD}/linux-5.4.0/samples/bpf/bytecode.o ${PWD}/guestend/
 	docker run --rm -it --privileged \
-		-v ${PWD}/eBPF-injection/shared/simplified-spscq:/code \
+		-v ${PWD}/guestend/simplified-spscq:/code \
 		bpf2004 make
-
-affinity:
 	docker run --rm -it --privileged \
 		-v ${PWD}/eBPF-injection/shared/affinity_test:/code \
 		bpf2004 make
 
-output:
-	cp ${PWD}/linux-5.4.0/samples/bpf/daemon_bpf ${PWD}/eBPF-injection/shared/daemon_bpf/
-	cp ${PWD}/linux-5.4.0/samples/bpf/myprog.o ${PWD}/eBPF-injection/bpfProg/
+host:
+	make -C ${PWD}/hostend/

@@ -10,13 +10,13 @@
 
 虚拟设备
 
-	qemu中实现一个虚拟设备(qemu/hw/misc/newdev.c) 作为TCP server
+	qemu中实现一个虚拟设备(qemu/hw/misc/hucdev.c) 作为TCP server
 		该虚拟设备会创建本地socket用于给host和guest进行通信
 
 设备驱动(guest中使用驱动)
 
-	其对应的驱动是eBPF-injection/shared/driver/driver.c(安装在guest系统中)
-	guest中运行应用程序 eBPF-injection/shared/daemon_bpf/daemon_bpf.c 来使用这个虚拟设备
+	其对应的驱动是guestend/driver/huc-driver.c(安装在guest系统中)
+	guest中运行应用程序 guestend/daemon.c 来使用这个虚拟设备
 		应用程序通过ioctl来操作虚拟设备驱动
 			daemon_bpf---ioctl--->driver
 
@@ -25,7 +25,7 @@
 
 主机如何触发全流程
 
-	host中运行 eBPF-injection/host_interface/injectProgram.c (TCP client)向服务端发送数据(eBPF-injection/bpfProg/myprog.c)
+	host中运行 hostend/injectByteCode.c (TCP client)向服务端发送数据(guestend/bytecode.c编译出来的bytecode)
 
 代码执行流程
 
@@ -54,20 +54,45 @@
 			此时就会进入到bytecode中运行对应的钩子程序bpf_prog1
 
 
-在guest中运行了守护程序daemon_bpf来读取虚拟设备的缓存
+在guest中运行了守护程序daemon来读取虚拟设备的缓存
 
-	将主机发送过来的bpfProg程序保存到本地并加载运行
+	将主机发送过来的bytecode程序保存到本地并加载运行
 	设置好cpu affinity后调用 ioctl(fd, IOCTL_SCHED_SETAFFINITY) 来设置cpu亲和性
-		iowrite32(requested_cpu, bufmmio + NEWDEV_REG_SETAFFINITY); //eBPF-injection/shared/driver/driver.c
-			newdev_bufmmio_write
-				sched_setaffinity //qemu/hw/misc/newdev.c
+		iowrite32(requested_cpu, bufmmio + NEWDEV_REG_SETAFFINITY); // guestend/driver/huc-driver.c
+			hucdev_bufmmio_write
+				sched_setaffinity //qemu/hw/misc/hucdev.c
 
-## 编译代码(driver, bitecode, daemon)
+## 准备qemu代码
+
+checkout qemu code
+
+	git checkout v5.0.0-rc4 -b v5p0p0rc4
+	git apply qemu-patch/*.patch
+
+compile qemu
+
+	make qemu
+
+Run qemu
+
+	/usr/local/bin/qemu-system-x86_64 \
+			-serial mon:stdio \
+			-drive file=ubt2004.qcow2,format=qcow2 \
+			-enable-kvm -m 2G -smp 2 \
+			-device e1000,netdev=ssh \
+			-netdev user,id=ssh,hostfwd=tcp::2222-:22 \
+			-vnc 0.0.0.0:0 \
+			-virtfs local,id=sfs,path=/root/huc,security_model=passthrough,mount_tag=shared \
+			-device newdev -device hucdev
+
+## 编译代码
 
 	make all
+	make qemu
 	make kernel
-	make daemon
-	make ...
+	make drv
+	make guest
+	make host
 
 编译完内核后,在容器中make install安装内核到容器的/boot
 
@@ -75,39 +100,16 @@
 
 然后将这个boot.tar解压到guest中即可更新guest内核
 
-## 编译qemu
-
-checkout qemu code
-
-	git checkout v5.0.0-rc4 -b v5p0p0rc4
-	git apply qemu-patch/*.patch
-
-Config and compile qemu(virtopt/dockerfile/Dockerfile)
-
-	drun -v /path/to/qemu:/code jammy:qemu /bin/bash
-	./make-deb.sh
-
-Run qemu
-
-	/usr/local/bin/qemu-system-x86_64 \
-			-serial mon:stdio \
-			-drive file=/root/hyperupcall/ubt2004.qcow2,format=qcow2 \
-			-enable-kvm -m 2G -smp 2 \
-			-device e1000,netdev=ssh \
-			-netdev user,id=ssh,hostfwd=tcp::2222-:22 \
-			-vnc 0.0.0.0:0 \
-			-virtfs local,id=sfs,path=/root/hyperupcall/eBPF-injection/shared,security_model=passthrough,mount_tag=shared \
-			-device newdev -device hucdev
-
 ## 测试
 
 测试步骤:
 
-在guest中安装驱动
+在guest中先挂载目录后安装驱动
 
 	mount -t 9p -o trans=virtio,version=9p2000.L shared shared
-	./insert_driver.sh
-	./daemon_bpf
+	insmod /root/shared/guestend/driver/huc-driver.ko
+	/root/shared/guestend/driver/mknoddev.sh hucdev
+	/root/shared/guestend/daemon
 
 在host上执行脚本
 
@@ -119,5 +121,5 @@ Run qemu
 
 执行测试脚本
 
-	cd /root/eBPF-injection/test
+	cd /root/huc/hostend/test
 	python3 wrapper-test.py --d 2 --v yes
