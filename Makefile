@@ -9,7 +9,7 @@ qemu:
 kernel:
 	docker run --rm -it --privileged \
 		--entrypoint=/code/compile-kernel.sh \
-		-v ${PWD}:/code \
+		-v ${PWD}/script/compile-kernel.sh:/code/compile-kernel.sh \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
 
 drv:
@@ -25,7 +25,7 @@ guest:
 	cp ${PWD}/guestend/rw-testdemo.c ${PWD}/linux-5.4.0/samples/bpf/
 	docker run --rm -it --privileged \
 		--entrypoint=/code/compile.sh \
-		-v ${PWD}:/code \
+		-v ${PWD}/script/compile.sh:/code/compile.sh \
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
 	cp ${PWD}/linux-5.4.0/samples/bpf/daemon ${PWD}/guestend/
 	cp ${PWD}/linux-5.4.0/samples/bpf/bytecode.o ${PWD}/guestend/
