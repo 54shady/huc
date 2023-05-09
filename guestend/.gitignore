@@ -2,3 +2,7 @@
 daemon
 simplified-spscq/spscq
 *.deb
+affinity_test
+complex
+split_thread_test
+yield_affinity_test

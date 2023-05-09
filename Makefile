@@ -19,7 +19,6 @@ drv:
 		-v ${PWD}/linux-5.4.0:/usr/src/linux bpf2004
 
 guest:
-	cp ${PWD}/guestend/Makefile ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/guestend/daemon.c ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/guestend/bpf_injection_msg.h ${PWD}/linux-5.4.0/samples/bpf/
 	cp ${PWD}/guestend/bytecode.c ${PWD}/linux-5.4.0/samples/bpf/
@@ -33,7 +32,7 @@ guest:
 		-v ${PWD}/guestend/simplified-spscq:/code \
 		bpf2004 make
 	docker run --rm -it --privileged \
-		-v ${PWD}/eBPF-injection/shared/affinity_test:/code \
+		-v ${PWD}/guestend/affinity_test:/code \
 		bpf2004 make
 
 host:

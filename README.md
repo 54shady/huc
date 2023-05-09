@@ -114,7 +114,11 @@ Run qemu
 
 测试步骤:
 
-在guest中先挂载目录后安装驱动
+1. 在测试主机上新建目录/root/huc并将(guestend, hostend都拷贝到该目录下)
+
+2. 启动虚拟机
+
+3. 在guest中先挂载目录后安装驱动
 
 	mount -t 9p -o trans=virtio,version=9p2000.L shared shared
 	insmod /root/shared/guestend/driver/huc-driver.ko
@@ -129,7 +133,7 @@ Run qemu
 	pip3 install invoke
 	pip3 install fabric
 
-执行测试脚本
+4. 执行测试脚本
 
 	cd /root/huc/hostend/test
 	python3 wrapper-test.py --d 2 --v yes
