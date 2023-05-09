@@ -85,6 +85,16 @@ Run qemu
 			-virtfs local,id=sfs,path=/root/huc,security_model=passthrough,mount_tag=shared \
 			-device newdev -device hucdev
 
+## 准备内核代码
+
+解压到当前目录
+
+	tar xvf /data/hyperupcall/linux-5.4.0.tar
+	cd linux-5.4.0/
+	patch -p1 < ../guestend/0001-Patch-huc-daemon.patch
+	cd ../
+	make kernel
+
 ## 编译代码
 
 	make all
