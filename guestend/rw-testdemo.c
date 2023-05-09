@@ -12,15 +12,15 @@
 #include <signal.h>
 #include <time.h>
 
-#define SIZE_64KB 65535
+#define SIZE_64BYTE 64
 #define DEV_NODE "/dev/testdemo"
 
 int main(int argc, char *argv[])
 {
 	int fd;
 	int ret;
-	char buf[SIZE_64KB] = {0};
-	char tmp[SIZE_64KB] = {0};
+	char buf[SIZE_64BYTE] = {0};
+	char tmp[SIZE_64BYTE] = {0};
 	FILE *fp;
 
 	if (argc < 2)
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 	if (!strcmp(argv[1], "r"))
 	{
 		ret = lseek(fd, 0, SEEK_SET);
-		ret = read(fd, buf, SIZE_64KB);
+		ret = read(fd, buf, SIZE_64BYTE);
 		printf("read %d\n", ret);
 		printf("buf = %s\n", buf);
 	}
@@ -53,11 +53,11 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 
-		ret = fread(tmp, 1, SIZE_64KB, fp);
+		ret = fread(tmp, 1, SIZE_64BYTE, fp);
 		printf("read %d bytes data\n", ret);
 		fclose(fp);
 
-		ret = write(fd, tmp, SIZE_64KB);
+		ret = write(fd, tmp, SIZE_64BYTE);
 		printf("write %d\n", ret);
 	}
 	else
