@@ -1,0 +1,203 @@
+From d512d529c7faf2cccac6730e525306c1e10389b3 Mon Sep 17 00:00:00 2001
+From: zeroway <M_O_Bz@163.com>
+Date: Tue, 9 May 2023 15:42:53 +0800
+Subject: [PATCH 4/4] Add testdemo
+
+---
+ hw/misc/Makefile.objs |   1 +
+ hw/misc/testdemo.c    | 171 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 172 insertions(+)
+ create mode 100644 hw/misc/testdemo.c
+
+diff --git a/hw/misc/Makefile.objs b/hw/misc/Makefile.objs
+index bff02f5332..98a95262b1 100644
+--- a/hw/misc/Makefile.objs
++++ b/hw/misc/Makefile.objs
+@@ -8,6 +8,7 @@ common-obj-$(CONFIG_ISA_TESTDEV) += pc-testdev.o
+ common-obj-$(CONFIG_PCI_TESTDEV) += pci-testdev.o
+ common-obj-$(CONFIG_NEWDEV) += newdev.o
+ common-obj-$(CONFIG_HUCDEV) += hucdev.o
++common-obj-y += testdemo.o
+ common-obj-$(CONFIG_TESTNEWDEV) += testnewdev.o
+ common-obj-$(CONFIG_PCA9552) += pca9552.o
+ 
+diff --git a/hw/misc/testdemo.c b/hw/misc/testdemo.c
+new file mode 100644
+index 0000000000..a0a408427e
+--- /dev/null
++++ b/hw/misc/testdemo.c
+@@ -0,0 +1,171 @@
++#include "qemu/osdep.h"
++#include "qemu/units.h"
++#include "hw/pci/pci.h"
++#include "hw/hw.h"
++#include "hw/pci/msi.h"
++#include "qemu/timer.h"
++#include "qemu/main-loop.h" /* iothread mutex */
++#include "qemu/module.h"
++#include "qapi/visitor.h"
++
++#include <sys/inotify.h>
++#include <errno.h>
++#include <poll.h>
++
++#include <sys/types.h>
++#include <sys/socket.h>
++
++#include "hw/core/cpu.h"
++#include "migration/vmstate.h"
++#include "sysemu/runstate.h"
++#include "migration/qemu-file-types.h"
++
++#include <sys/sysinfo.h>
++#include <sched.h>
++
++#define TESTDEMO_BUF_MASK 0xFFFF
++#define TESTDEMO_BUFRW_PCI_BAR 2
++#define TYPE_TESTDEMO_DEVICE "testdemo"
++#define TESTDEMO_BUF_SIZE_RW 16384
++#define TESTDEMO_DEV(obj) OBJECT_CHECK(TestDemoState, obj, TYPE_TESTDEMO_DEVICE)
++#define TESTDEMO_DEVICE_ID 0x5679
++
++typedef struct {
++	PCIDevice pdev;
++	MemoryRegion mmio;
++	uint32_t *buffer;
++	uint32_t nr_buffer;
++} TestDemoState;
++
++static void testdemo_instance_init(Object *obj)
++{
++	return;
++}
++
++static uint64_t testdemo_bufmmio_read(void *opaque, hwaddr addr, unsigned size)
++{
++	TestDemoState *s = opaque;
++	unsigned int index;
++
++	addr = addr & TESTDEMO_BUF_MASK;
++	index = addr >> 2;
++
++	if (addr + size > TESTDEMO_BUF_SIZE_RW * sizeof(uint32_t))
++	{
++		perror("Out of bounds\n");
++		return 0;
++	}
++
++	printf("Read>> Add: %lx, buf[%d] = %c\n", addr, index, s->buffer[index]);
++	return s->buffer[index];
++}
++
++static void testdemo_bufmmio_write(void *opaque, hwaddr addr, uint64_t val,
++		unsigned size)
++{
++	TestDemoState *s = opaque;
++	unsigned int index;
++
++	addr = addr & TESTDEMO_BUF_MASK;
++	index = addr >> 2;
++
++	if (addr + size > TESTDEMO_BUF_SIZE_RW * sizeof(uint32_t))
++	{
++		perror("Out of bounds\n");
++		return;
++	}
++
++	printf("Write addr: %lx, size: %d write value(%c) into index(%u)\n", addr,
++			size, (uint32_t)val, index);
++	s->buffer[index] = val;
++
++	return;
++}
++
++static const MemoryRegionOps testdemo_bufmmio_ops = {
++	.read = testdemo_bufmmio_read,
++	.write = testdemo_bufmmio_write,
++	.endianness = DEVICE_NATIVE_ENDIAN,
++	.impl = {
++		.min_access_size = 4,
++		.max_access_size = 4,
++	},
++};
++
++static const VMStateDescription tdvs = {
++    .name = "TestDemo",
++    .version_id = 3,
++    .minimum_version_id = 3,
++    .fields = (VMStateField[]) {
++		VMSTATE_PCI_DEVICE(pdev, TestDemoState),
++		VMSTATE_VARRAY_UINT32_ALLOC(buffer, TestDemoState, nr_buffer, 0,
++				vmstate_info_uint32, uint32_t),
++        VMSTATE_END_OF_LIST()
++    }
++};
++
++static void testdemo_realize(PCIDevice *pdev, Error **errp)
++{
++	TestDemoState *s = TESTDEMO_DEV(pdev);
++
++    vmstate_register(VMSTATE_IF(s), 0, &tdvs, s);
++	s->nr_buffer = TESTDEMO_BUF_SIZE_RW;
++
++	/* Init memory mapped memory region, for read/write test */
++	memory_region_init_io(&s->mmio,
++			OBJECT(s),
++			&testdemo_bufmmio_ops,
++			s,
++			"testdemo-buffer",
++			TESTDEMO_BUF_SIZE_RW * sizeof(uint32_t));
++	pci_register_bar(pdev,
++			TESTDEMO_BUFRW_PCI_BAR,
++			PCI_BASE_ADDRESS_SPACE_MEMORY,
++			&s->mmio);
++
++	s->buffer = malloc(TESTDEMO_BUF_SIZE_RW * sizeof(uint32_t));
++	if (!s->buffer)
++	{
++		perror("No memory");
++		return;
++	}
++
++}
++
++static void testdemo_uninit(PCIDevice *pdev)
++{
++}
++
++static void testdemo_class_init(ObjectClass *class, void *data)
++{
++	DeviceClass *dc = DEVICE_CLASS(class);
++	PCIDeviceClass *k = PCI_DEVICE_CLASS(class);
++
++	k->realize = testdemo_realize;
++	k->exit = testdemo_uninit;
++	k->vendor_id = PCI_VENDOR_ID_QEMU;
++	k->device_id = TESTDEMO_DEVICE_ID;
++	k->class_id = PCI_CLASS_OTHERS;
++
++	set_bit(DEVICE_CATEGORY_MISC, dc->categories);
++}
++
++static void testdemo_register_types(void)
++{
++	static InterfaceInfo interfaces[] = {
++		{ INTERFACE_CONVENTIONAL_PCI_DEVICE },
++		{ },
++	};
++
++	static const TypeInfo testdemo_info = {
++		.name = TYPE_TESTDEMO_DEVICE,
++		.parent = TYPE_PCI_DEVICE,
++		.instance_size = sizeof(TestDemoState),
++		.instance_init = testdemo_instance_init,
++		.class_init = testdemo_class_init,
++		.interfaces = interfaces,
++	};
++
++	type_register_static(&testdemo_info);
++}
++type_init(testdemo_register_types)
+-- 
+2.35.1
+

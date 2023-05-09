@@ -6,3 +6,4 @@ affinity_test
 complex
 split_thread_test
 yield_affinity_test
+rw-testdemo
