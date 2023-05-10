@@ -73,6 +73,9 @@ static struct file_operations fops = {
 
 static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
+	//unsigned long adr;
+	//unsigned int busadr;
+
 	major = register_chrdev(0, TESTDEMO_NAME, &fops);
 	if (pci_enable_device(pdev) < 0)
 	{
@@ -85,6 +88,19 @@ static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(&(pdev->dev), "request buffer region error\n");
 		goto error;
 	}
+
+	/*
+	 * 这里可以手动进行映射物理地址
+	 * 在qemu monitor里查询设备的物理地址,和大小
+	 * (qemu) info pci
+	 * Bus  0, device   5, function 0:
+	 * Class 0255: PCI device 1234:5679
+	 *  PCI subsystem 1af4:1100
+	 *  BAR2: 32 bit memory at 0xfebb0000 [0xfebbffff].
+	 *
+	 * 直接使用ioremap映射
+	 * bufmmio = ioremap(0xfebb0000, 0xffff);
+	 */
 	bufmmio = pci_iomap(pdev,
 			TESTDEMO_BUFRW_PCI_BAR,
 			pci_resource_len(pdev, TESTDEMO_BUFRW_PCI_BAR));
@@ -93,6 +109,10 @@ static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("%s, %d\n", "error", __LINE__);
 		goto error;
 	}
+
+	//adr = virt_to_phys(bufmmio);
+	//busadr = virt_to_bus(bufmmio);
+	//printk("bufmmio = %x, adr = %lx, bus=%x\n", bufmmio, adr, busadr);
 
 	pr_info("pci_probe COMPLETED SUCCESSFULLY\n");
 
