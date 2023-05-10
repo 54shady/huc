@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 		printf("read %d bytes data\n", ret);
 		fclose(fp);
 
-		ret = write(fd, tmp, SIZE_64BYTE);
+		ret = write(fd, tmp, ret < SIZE_64BYTE ? ret : SIZE_64BYTE);
 		printf("write %d\n", ret);
 	}
 	else

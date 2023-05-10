@@ -13,6 +13,11 @@ static void __iomem *bufmmio;
 
 static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
 {
+#ifndef COPY_BYTE_TO_BYTE
+	copy_to_user(buf, bufmmio, len);
+
+	return len;
+#else
 	ssize_t ret;
 	u32 kbuf;
 	u8 *p = (u8 *)&kbuf;
@@ -37,10 +42,16 @@ static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, lo
 	}
 
 	return ret;
+#endif
 }
 
 static ssize_t testdemo_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
 {
+#ifndef COPY_BYTE_TO_BYTE
+	copy_from_user(bufmmio, buf, len);
+
+	return len;
+#else
 	int left = len;
 	u32 kbuf;
 	u8 *p = (u8 *)&kbuf;
@@ -55,6 +66,7 @@ static ssize_t testdemo_write(struct file *filp, const char __user *buf, size_t 
 	}
 
 	return len;
+#endif
 }
 
 static long testdemo_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
