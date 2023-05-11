@@ -1,0 +1,54 @@
+From ca0e4a79ab671d0b0a5919824e33c720cee66438 Mon Sep 17 00:00:00 2001
+From: zeroway <M_O_Bz@163.com>
+Date: Thu, 11 May 2023 15:44:26 +0800
+Subject: [PATCH 6/6] Print data every each by byte
+
+---
+ hw/misc/testdemo.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/hw/misc/testdemo.c b/hw/misc/testdemo.c
+index 604eca32e4..1e02d49998 100644
+--- a/hw/misc/testdemo.c
++++ b/hw/misc/testdemo.c
+@@ -57,6 +57,7 @@ static uint64_t testdemo_bufmmio_read(void *opaque, hwaddr addr, unsigned size)
+ {
+ 	TestDemoState *s = opaque;
+ 	unsigned int index;
++	uint8_t *p;
+ 
+ 	addr = addr & TESTDEMO_BUF_MASK;
+ 	index = addr >> 2;
+@@ -67,7 +68,9 @@ static uint64_t testdemo_bufmmio_read(void *opaque, hwaddr addr, unsigned size)
+ 		return 0;
+ 	}
+ 
+-	printf("Read>> Add: %lx, buf[%d] = %c\n", addr, index, s->buffer[index]);
++	p = (uint8_t *)&(s->buffer[index]);
++	printf("Read>> Addr: 0x%lx, buf[%d] = %c%c%c%c\n",
++			addr, index, p[0], p[1], p[2], p[3]);
+ 	return s->buffer[index];
+ }
+ 
+@@ -76,6 +79,7 @@ static void testdemo_bufmmio_write(void *opaque, hwaddr addr, uint64_t val,
+ {
+ 	TestDemoState *s = opaque;
+ 	unsigned int index;
++	uint8_t *p = (uint8_t *)&val;
+ 
+ 	addr = addr & TESTDEMO_BUF_MASK;
+ 	index = addr >> 2;
+@@ -86,8 +90,8 @@ static void testdemo_bufmmio_write(void *opaque, hwaddr addr, uint64_t val,
+ 		return;
+ 	}
+ 
+-	printf("Write addr: %lx, size: %d write value(%c) into index(%u)\n", addr,
+-			size, (uint32_t)val, index);
++	printf("Write addr: 0x%lx, size: %d write value(%c%c%c%c) into index(%u)\n",
++			addr, size, p[0], p[1], p[2], p[3], index);
+ 	s->buffer[index] = val;
+ 
+ 	return;
+-- 
+2.35.1
+
