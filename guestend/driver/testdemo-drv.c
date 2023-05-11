@@ -1,15 +1,17 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/cdev.h>
 
 #define TESTDEMO_NAME "testdemo"
 #define TESTDEMO_DEVICE_ID 0x5679
 #define QEMU_VENDOR_ID 0x1234
-
 #define TESTDEMO_BUFRW_PCI_BAR 2
 
 static int major;
 static void __iomem *bufmmio;
+static struct class *cls;
+static struct cdev testdemo_cdev;
 
 static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
 {
@@ -85,10 +87,19 @@ static struct file_operations fops = {
 
 static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	//unsigned long adr;
-	//unsigned int busadr;
+	dev_t dev_id;
+	int retval;
 
-	major = register_chrdev(0, TESTDEMO_NAME, &fops);
+	retval = alloc_chrdev_region(&dev_id, 0, 1, "testdemo");
+	major = MAJOR(dev_id);
+	cdev_init(&testdemo_cdev, &fops);
+	cdev_add(&testdemo_cdev, dev_id, 1);
+	cls = class_create(THIS_MODULE, "testdemo");
+	if (IS_ERR(cls))
+		return -EINVAL;
+
+	device_create(cls, NULL, MKDEV(major, 0), NULL, "testdemo"); /* /dev/testdemo */
+
 	if (pci_enable_device(pdev) < 0)
 	{
 		dev_err(&(pdev->dev), "enable pci device error\n");
@@ -122,10 +133,6 @@ static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto error;
 	}
 
-	//adr = virt_to_phys(bufmmio);
-	//busadr = virt_to_bus(bufmmio);
-	//printk("bufmmio = %x, adr = %lx, bus=%x\n", bufmmio, adr, busadr);
-
 	pr_info("pci_probe COMPLETED SUCCESSFULLY\n");
 
 	return 0;
@@ -135,11 +142,17 @@ error:
 
 static void testdemo_pci_remove(struct pci_dev *pdev)
 {
-	pr_info("remove\n");
+	dev_t dev_id;
 
-	pci_release_region(pdev, TESTDEMO_BUFRW_PCI_BAR);
-	iounmap(bufmmio);
+	printk("%s, %d\n", __FUNCTION__, __LINE__);
+
+	dev_id = MKDEV(major, 0);
+	device_destroy(cls, dev_id);
+	class_destroy(cls);
+	cdev_del(&testdemo_cdev);
 	unregister_chrdev(major, TESTDEMO_NAME);
+	iounmap(bufmmio);
+	pci_release_region(pdev, TESTDEMO_BUFRW_PCI_BAR);
 
 	return;
 }
@@ -167,6 +180,7 @@ static int testdemo_init(void)
 
 static void testdemo_exit(void)
 {
+	printk("%s, %d\n", __FUNCTION__, __LINE__);
 	pci_unregister_driver(&testdemo_pci_driver);
 }
 
