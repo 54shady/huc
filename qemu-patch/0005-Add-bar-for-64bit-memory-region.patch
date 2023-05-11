@@ -1,0 +1,115 @@
+From 9feca8821679816465ae0e31742b0582b8cfe74f Mon Sep 17 00:00:00 2001
+From: zeroway <M_O_Bz@163.com>
+Date: Thu, 11 May 2023 14:58:44 +0800
+Subject: [PATCH 5/5] Add bar for 64bit memory region
+
+---
+ hw/misc/testdemo.c | 58 +++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 55 insertions(+), 3 deletions(-)
+
+diff --git a/hw/misc/testdemo.c b/hw/misc/testdemo.c
+index a0a408427e..604eca32e4 100644
+--- a/hw/misc/testdemo.c
++++ b/hw/misc/testdemo.c
+@@ -24,7 +24,14 @@
+ #include <sched.h>
+ 
+ #define TESTDEMO_BUF_MASK 0xFFFF
+-#define TESTDEMO_BUFRW_PCI_BAR 2
++
++/*
++ * bar1 must for 32bit memory region
++ * bar2 must for 64bit memory region
++ */
++#define TESTDEMO_BUF32_PCI_BAR 1
++#define TESTDEMO_BUF64_PCI_BAR 2
++
+ #define TYPE_TESTDEMO_DEVICE "testdemo"
+ #define TESTDEMO_BUF_SIZE_RW 16384
+ #define TESTDEMO_DEV(obj) OBJECT_CHECK(TestDemoState, obj, TYPE_TESTDEMO_DEVICE)
+@@ -35,6 +42,10 @@ typedef struct {
+ 	MemoryRegion mmio;
+ 	uint32_t *buffer;
+ 	uint32_t nr_buffer;
++
++	MemoryRegion mmio64;
++	uint64_t *buffer64;
++	uint64_t nr_buffer64;
+ } TestDemoState;
+ 
+ static void testdemo_instance_init(Object *obj)
+@@ -82,13 +93,35 @@ static void testdemo_bufmmio_write(void *opaque, hwaddr addr, uint64_t val,
+ 	return;
+ }
+ 
++static uint64_t testdemo_bufmmio_read64(void *opaque, hwaddr addr, unsigned size)
++{
++	printf("%s, %d\n", __FUNCTION__, __LINE__);
++
++	return 0;
++}
++static void testdemo_bufmmio_write64(void *opaque, hwaddr addr, uint64_t val,
++		unsigned size)
++{
++	printf("%s, %d: addr = 0x%lx, size = %d\n", __FUNCTION__, __LINE__, addr, size);
++}
++
++static const MemoryRegionOps testdemo_bufmmio_ops64 = {
++	.read = testdemo_bufmmio_read64,
++	.write = testdemo_bufmmio_write64,
++	.endianness = DEVICE_NATIVE_ENDIAN,
++	.impl = {
++		.min_access_size = 8,
++		.max_access_size = 8, /* 这里限制了一次最大访问数据宽度 */
++	},
++};
++
+ static const MemoryRegionOps testdemo_bufmmio_ops = {
+ 	.read = testdemo_bufmmio_read,
+ 	.write = testdemo_bufmmio_write,
+ 	.endianness = DEVICE_NATIVE_ENDIAN,
+ 	.impl = {
+ 		.min_access_size = 4,
+-		.max_access_size = 4,
++		.max_access_size = 4, /* 这里限制了一次最大访问数据宽度 */
+ 	},
+ };
+ 
+@@ -119,7 +152,7 @@ static void testdemo_realize(PCIDevice *pdev, Error **errp)
+ 			"testdemo-buffer",
+ 			TESTDEMO_BUF_SIZE_RW * sizeof(uint32_t));
+ 	pci_register_bar(pdev,
+-			TESTDEMO_BUFRW_PCI_BAR,
++			TESTDEMO_BUF32_PCI_BAR,
+ 			PCI_BASE_ADDRESS_SPACE_MEMORY,
+ 			&s->mmio);
+ 
+@@ -130,6 +163,25 @@ static void testdemo_realize(PCIDevice *pdev, Error **errp)
+ 		return;
+ 	}
+ 
++	/* Init 64bit memory region */
++	memory_region_init_io(&s->mmio64,
++			OBJECT(s),
++			&testdemo_bufmmio_ops64,
++			s,
++			"buffer64bit",
++			TESTDEMO_BUF_SIZE_RW * sizeof(uint64_t));
++	pci_register_bar(pdev,
++			TESTDEMO_BUF64_PCI_BAR,
++			PCI_BASE_ADDRESS_SPACE_MEMORY |
++			PCI_BASE_ADDRESS_MEM_PREFETCH |
++			PCI_BASE_ADDRESS_MEM_TYPE_64,
++			&s->mmio64);
++	s->buffer64 = malloc(TESTDEMO_BUF_SIZE_RW * sizeof(uint64_t));
++	if (!s->buffer64)
++	{
++		perror("No memory");
++		return;
++	}
+ }
+ 
+ static void testdemo_uninit(PCIDevice *pdev)
+-- 
+2.35.1
+

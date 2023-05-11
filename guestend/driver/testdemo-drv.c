@@ -6,18 +6,27 @@
 #define TESTDEMO_NAME "testdemo"
 #define TESTDEMO_DEVICE_ID 0x5679
 #define QEMU_VENDOR_ID 0x1234
-#define TESTDEMO_BUFRW_PCI_BAR 2
+#define TESTDEMO_BUF32_PCI_BAR 1
+#define TESTDEMO_BUF64_PCI_BAR 2
+
+#undef TEST_64BIT_MMIO
 
 static int major;
 static void __iomem *bufmmio;
+#ifdef TEST_64BIT_MMIO
+static void __iomem *bufmmio64;
+#endif
 static struct class *cls;
 static struct cdev testdemo_cdev;
 
 static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
 {
+#ifdef TEST_64BIT_MMIO
+	copy_to_user(buf, bufmmio64, len);
+	return len;
+#else
 #ifndef COPY_BYTE_TO_BYTE
 	copy_to_user(buf, bufmmio, len);
-
 	return len;
 #else
 	ssize_t ret;
@@ -29,7 +38,6 @@ static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, lo
 	{
 		kbuf = ioread32(bufmmio + *off);
 		left -= 4;
-		//printk("len = %ld, offset = %d, \n", len, *off);
 		printk("%c%c%c%c\n", p[0], p[1], p[2], p[3]);
 
 		if (copy_to_user(buf + *off, (void *)&kbuf, 4))
@@ -45,13 +53,18 @@ static ssize_t testdemo_read(struct file *filp, char __user *buf, size_t len, lo
 
 	return ret;
 #endif
+
+#endif
 }
 
 static ssize_t testdemo_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
 {
+#ifdef TEST_64BIT_MMIO
+	copy_from_user(bufmmio64, buf, len);
+	return len;
+#else
 #ifndef COPY_BYTE_TO_BYTE
 	copy_from_user(bufmmio, buf, len);
-
 	return len;
 #else
 	int left = len;
@@ -68,6 +81,8 @@ static ssize_t testdemo_write(struct file *filp, const char __user *buf, size_t 
 	}
 
 	return len;
+#endif
+
 #endif
 }
 
@@ -106,7 +121,7 @@ static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto error;
 	}
 
-	if (pci_request_region(pdev, TESTDEMO_BUFRW_PCI_BAR, "bufregion"))
+	if (pci_request_region(pdev, TESTDEMO_BUF32_PCI_BAR, "bufregion"))
 	{
 		dev_err(&(pdev->dev), "request buffer region error\n");
 		goto error;
@@ -125,13 +140,28 @@ static int testdemo_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * bufmmio = ioremap(0xfebb0000, 0xffff);
 	 */
 	bufmmio = pci_iomap(pdev,
-			TESTDEMO_BUFRW_PCI_BAR,
-			pci_resource_len(pdev, TESTDEMO_BUFRW_PCI_BAR));
+			TESTDEMO_BUF32_PCI_BAR,
+			pci_resource_len(pdev, TESTDEMO_BUF32_PCI_BAR));
 	if (!bufmmio)
 	{
 		printk("%s, %d\n", "error", __LINE__);
 		goto error;
 	}
+#ifdef TEST_64BIT_MMIO
+	if (pci_request_region(pdev, TESTDEMO_BUF64_PCI_BAR, "bufregion64"))
+	{
+		dev_err(&(pdev->dev), "request buffer region error\n");
+		goto error;
+	}
+	bufmmio64 = pci_iomap(pdev,
+			TESTDEMO_BUF64_PCI_BAR,
+			pci_resource_len(pdev, TESTDEMO_BUF64_PCI_BAR));
+	if (!bufmmio64)
+	{
+		printk("%s, %d\n", "error", __LINE__);
+		goto error;
+	}
+#endif
 
 	pr_info("pci_probe COMPLETED SUCCESSFULLY\n");
 
@@ -152,7 +182,11 @@ static void testdemo_pci_remove(struct pci_dev *pdev)
 	cdev_del(&testdemo_cdev);
 	unregister_chrdev(major, TESTDEMO_NAME);
 	iounmap(bufmmio);
-	pci_release_region(pdev, TESTDEMO_BUFRW_PCI_BAR);
+	pci_release_region(pdev, TESTDEMO_BUF32_PCI_BAR);
+#ifdef TEST_64BIT_MMIO
+	iounmap(bufmmio64);
+	pci_release_region(pdev, TESTDEMO_BUF64_PCI_BAR);
+#endif
 
 	return;
 }
