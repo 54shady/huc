@@ -1,0 +1,33 @@
+From 7f9ef00b13764d9659053005c041abdc04f8b8af Mon Sep 17 00:00:00 2001
+From: zeroway <M_O_Bz@163.com>
+Date: Fri, 12 May 2023 11:52:43 +0800
+Subject: [PATCH 7/7] PCI bar is a 32bit size
+
+---
+ hw/misc/testdemo.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/hw/misc/testdemo.c b/hw/misc/testdemo.c
+index 1e02d49998..a8051b063f 100644
+--- a/hw/misc/testdemo.c
++++ b/hw/misc/testdemo.c
+@@ -26,8 +26,14 @@
+ #define TESTDEMO_BUF_MASK 0xFFFF
+ 
+ /*
+- * bar1 must for 32bit memory region
+- * bar2 must for 64bit memory region
++ * bar1 for 32bit memory region
++ * bar2 for 64bit memory region
++ *
++ * A device can have up to six 32-bit BARs
++ * or combine two BARs to a 64-bit BAR.
++ *
++ * so what if you wanna place the 64bit memroy on bar 1
++ * then make sure place the 32bit bar on bar3 can still work
+  */
+ #define TESTDEMO_BUF32_PCI_BAR 1
+ #define TESTDEMO_BUF64_PCI_BAR 2
+-- 
+2.35.1
+
