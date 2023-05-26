@@ -1,25 +1,26 @@
-From b634ecb95053c6975e4da33543d90464bc39b358 Mon Sep 17 00:00:00 2001
+From 0bea20c2ccbc167222208d41f7e56c890e783c13 Mon Sep 17 00:00:00 2001
 From: zeroway <M_O_Bz@163.com>
-Date: Tue, 9 May 2023 14:35:21 +0800
+Date: Mon, 29 May 2023 10:08:14 +0800
 Subject: [PATCH] Patch huc daemon
 
 ---
- samples/bpf/Makefile | 3 +++
- 1 file changed, 3 insertions(+)
+ samples/bpf/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-index 6d1df7117..8a8e62c30 100644
+index 42b571cde177..7c81784d0239 100644
 --- a/samples/bpf/Makefile
 +++ b/samples/bpf/Makefile
-@@ -53,6 +53,7 @@ hostprogs-y += task_fd_query
+@@ -53,6 +53,8 @@ hostprogs-y += task_fd_query
  hostprogs-y += xdp_sample_pkts
  hostprogs-y += ibumad
  hostprogs-y += hbm
 +hostprogs-y += daemon
++hostprogs-y += rw-testdemo
  
  # Libbpf dependencies
  LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
-@@ -64,6 +65,7 @@ fds_example-objs := fds_example.o
+@@ -64,6 +66,7 @@ fds_example-objs := fds_example.o
  sockex1-objs := sockex1_user.o
  sockex2-objs := sockex2_user.o
  sockex3-objs := bpf_load.o sockex3_user.o
@@ -27,7 +28,7 @@ index 6d1df7117..8a8e62c30 100644
  tracex1-objs := bpf_load.o tracex1_user.o
  tracex2-objs := bpf_load.o tracex2_user.o
  tracex3-objs := bpf_load.o tracex3_user.o
-@@ -170,6 +172,7 @@ always += xdp_sample_pkts_kern.o
+@@ -170,6 +173,7 @@ always += xdp_sample_pkts_kern.o
  always += ibumad_kern.o
  always += hbm_out_kern.o
  always += hbm_edt_kern.o

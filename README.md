@@ -3,7 +3,7 @@
 ## 准备运行环境
 
 - host 20.04 or 22.04 and guest 20.04
-- guest ubuntu 20.04 kernel version: linux-5.4.224
+- guest ubuntu 20.04 kernel version: linux-5.4.0
 - enable guest root ssh enable and password to 0
 
 ## 代码实现原理
@@ -85,14 +85,12 @@ Run qemu
 			-virtfs local,id=sfs,path=/root/huc,security_model=passthrough,mount_tag=shared \
 			-device newdev -device hucdev
 
-## 准备内核代码
+## 准备内核代码(tag 5.4)
 
-解压到当前目录
-
-	tar xvf /data/hyperupcall/linux-5.4.0.tar
-	cd linux-5.4.0/
-	patch -p1 < ../guestend/0001-Patch-huc-daemon.patch
-	cd ../
+	cd ${HOME}/src/linux
+	git checkout v5.4 -b v5p4
+	patch -p1 < ${HOME}/github/huc/guestend/0001-Patch-huc-daemon.patch
+	cd ${HOME}/github/huc
 	make kernel
 
 ## 编译代码
