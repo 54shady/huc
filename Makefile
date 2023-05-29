@@ -2,9 +2,9 @@ all:qemu kernel drv guest host
 
 qemu:
 	docker run --rm -it --privileged \
-		-v ~/src/qemu:/code \
+		-v ${HOME}/src/qemu:/code \
 		huc
-	cp ~/src/qemu/newdev-qemu.deb guestend/
+	cp ${HOME}/src/qemu/newdev-qemu.deb guestend/
 
 kernel:
 	docker run --rm -it --privileged \
