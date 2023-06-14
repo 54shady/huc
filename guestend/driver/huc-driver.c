@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/cdev.h>
 
 #include "bpf_injection_msg.h"
 
@@ -18,6 +19,8 @@
 #define HUCDEV_REG_SETAFFINITY	12
 
 static int major;
+static struct class *cls;
+static struct cdev huc_cdev;
 
 #if 0
 static loff_t huc_llseek(struct file *filp, loff_t off, int whence)
@@ -169,7 +172,19 @@ static irqreturn_t irq_handler(int irq, void *dev)
 
 static int huc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	major = register_chrdev(0, HUCDEV_NAME, &fops);
+	dev_t dev_id;
+
+	/* mknode automatically */
+	alloc_chrdev_region(&dev_id, 0, 1, "hucdev");
+	major = MAJOR(dev_id);
+	cdev_init(&huc_cdev, &fops);
+	cdev_add(&huc_cdev, dev_id, 1);
+	cls = class_create(THIS_MODULE, "hucdev");
+	if (IS_ERR(cls))
+		return -EINVAL;
+
+	device_create(cls, NULL, MKDEV(major, 0), NULL, "hucdev"); /* /dev/testdemo */
+
 	if (pci_enable_device(pdev) < 0)
 	{
 		dev_err(&(pdev->dev), "enable pci device error\n");
@@ -209,7 +224,14 @@ error:
 
 static void huc_pci_remove(struct pci_dev *pdev)
 {
+	dev_t dev_id;
+
 	pr_info("remove\n");
+	dev_id = MKDEV(major, 0);
+	device_destroy(cls, dev_id);
+	class_destroy(cls);
+	cdev_del(&huc_cdev);
+	unregister_chrdev_region(dev_id, 1);
 
 	pci_release_region(pdev, HUCDEV_BUF_PCI_BAR);
 	iounmap(bufmmio);

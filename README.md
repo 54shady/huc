@@ -123,7 +123,6 @@ Run qemu
 
 	mount -t 9p -o trans=virtio,version=9p2000.L shared shared
 	insmod /root/shared/guestend/driver/huc-driver.ko
-	/root/shared/guestend/driver/mknoddev.sh hucdev
 	/root/shared/guestend/daemon
 
 在host上执行脚本
