@@ -93,7 +93,11 @@ void runon(const char *name, int i){
 
     if (NUM_CPUS == 0) {
         NUM_CPUS = sysconf(_SC_NPROCESSORS_ONLN);
-        // printf("system has %d cores\n", NUM_CPUS);
+		/*
+		 * print message to stdio will cause computeMeanAndStdDev error
+		 * do not call printf in this file
+         * printf("system has %d cores\n", NUM_CPUS);
+		 */
     }
     CPU_ZERO(&cpumask);
     if (i >= 0) {

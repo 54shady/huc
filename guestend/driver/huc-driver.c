@@ -3,7 +3,7 @@
 #include <linux/pci.h>
 #include <linux/cdev.h>
 
-#include "bpf_injection_msg.h"
+#include "huc_msg.h"
 
 #define HUCDEV_NAME "hucdev"
 #define HUC_DEVICE_ID 0x11eb
@@ -18,18 +18,13 @@
 #define HUCDEV_REG_DOORBELL		8
 #define HUCDEV_REG_SETAFFINITY	12
 
+#define IOCTL_SCHED_SETAFFINITY 13
+#define IOCTL_PROGRAM_INJECTION_RESULT_READY 14
+
 static int major;
 static struct class *cls;
 static struct cdev huc_cdev;
 
-#if 0
-static loff_t huc_llseek(struct file *filp, loff_t off, int whence)
-{
-	pr_info("llseek\n");
-
-	return 0;
-}
-#endif
 /*
  * flag = 1: read payload
  * flag = 2: read header
@@ -44,12 +39,12 @@ static ssize_t huc_read(struct file *filp, char __user *buf, size_t len, loff_t 
 	ssize_t ret;
 	/* 因为pci的buf是按u32来存储的 */
 	u32 kbuf;
-	struct bpf_injection_msg_header myheader;
+	struct huc_msg_header myheader;
 
 	/* 没有可读取的数据时睡眠在这 */
 	wait_event_interruptible(wq, flag >=1);
 
-	printk("%s, %d\n", __FUNCTION__, __LINE__);
+	//printk("%s, %d\n", __FUNCTION__, __LINE__);
 	/*
 	 * 1. 读取的偏移量要按4字节对齐,否则返回
 	 * 2. 读取的长度是0也返回
@@ -111,7 +106,29 @@ static ssize_t huc_write(struct file *filp, const char __user *buf, size_t len, 
 
 static long huc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	pr_info("ioctl\n");
+    switch (cmd) {
+        case IOCTL_PROGRAM_INJECTION_RESULT_READY:
+			//bpf program result inserted in buffer area as bpf_injection_msg_t
+			pr_info("response is ready!!! [dev]\n");
+			iowrite32(1, bufmmio + HUCDEV_REG_DOORBELL);
+			//signal to device
+			break;
+		case IOCTL_SCHED_SETAFFINITY:
+        {
+			/*
+			 * Retrieve the requested cpu from userspace
+			 * Write in specific region in device to trigger the sched_setaffinity in host system
+			 */
+			int requested_cpu;
+
+			if (copy_from_user(&requested_cpu, (int *)arg, sizeof(int))) {
+				return -EACCES;
+			}
+			pr_debug("IOCTL requested_cpu: %d\n", requested_cpu);
+			iowrite32(requested_cpu, bufmmio + HUCDEV_REG_SETAFFINITY);
+			break;
+        }
+	}
 	return 0;
 }
 
@@ -155,6 +172,17 @@ static irqreturn_t irq_handler(int irq, void *dev)
 				 * 这里唤醒调用read的应用程序
 				 * 通知其数据到来接收数据
 				 */
+				wake_up_interruptible(&wq);
+				break;
+			case PROGRAM_INJECTION_AFFINITY:
+				pr_info("PROGRAM_INJECTION_AFFINITY irq handler\n");
+				flag = 2;
+				wake_up_interruptible(&wq);
+				break;
+			case 22:
+				pr_info("handling irq 22 for INIT\n");
+				//init_handler();
+				flag = 1;
 				wake_up_interruptible(&wq);
 				break;
 		}
@@ -215,7 +243,7 @@ static int huc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto error;
 	}
 
-	pr_info("pci_probe COMPLETED SUCCESSFULLY\n");
+	pr_info("HUC DEVICE PROBE SUCCESSFULLY\n");
 
 	return 0;
 error:

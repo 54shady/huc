@@ -31,7 +31,7 @@
 
 	wrapper-test.py
 		test.py
-			injectProgram.sh(run injectProgram)
+			a. injectBpfProgram//injectProgram.sh(run injectProgram)
 				1. 将bytecode.c编译产生的bpf bytecode通过网络发送到虚拟设备的缓存中
 				2. 虚拟设备根据bitecode的header中的type类型来判断需要如何处理
 					虚拟设备发送中断给guest来通知收取bpf bitecode
@@ -48,17 +48,18 @@
 					对应的set_affinity,在虚拟设备中进行系统调用,来实现
 					if (sched_setaffinity(cpu->thread_id, SET_SIZE, set) == -1){
 
-			远程触发guest中的脚本python3 affinity_test.py
+			b. 远程触发guest中的脚本python3 affinity_test.py
 			将会在guest中运行spscq
-			spscq的运行会导致guest中调用到内核的sched_setaffinity
+			spscq的运行会导致guest中调用到内核的sched_setaffinity(bpf trace中看到该程序触发)
+			spscq是一个生产者和消费者模型,分别在生产者和消费者线程中都调用了mlib.c里的runon
+			runon中通过CPU_SET(底层函数就是sched_setaffinity)来设置了cpu亲和性
 			此时就会进入到bytecode中运行对应的钩子程序bpf_prog1
-
 
 在guest中运行了守护程序daemon来读取虚拟设备的缓存
 
 	将主机发送过来的bytecode程序保存到本地并加载运行
 	设置好cpu affinity后调用 ioctl(fd, IOCTL_SCHED_SETAFFINITY) 来设置cpu亲和性
-		iowrite32(requested_cpu, bufmmio + NEWDEV_REG_SETAFFINITY); // guestend/driver/huc-driver.c
+		iowrite32(requested_cpu, bufmmio + HUCDEV_REG_SETAFFINITY); // guestend/driver/huc-driver.c
 			hucdev_bufmmio_write
 				sched_setaffinity //qemu/hw/misc/hucdev.c
 
@@ -71,6 +72,13 @@ checkout qemu code
 	git config --global --add safe.directory /code
 	git submodule update
 
+链接文件
+
+	cp ${PWD}/qemu-patch/hucdev.c ${HOME}/src/huc-qemu/hw/misc/
+	cp ${PWD}/qemu-patch/bpf_injection_msg.h ${HOME}/src/huc-qemu/hw/misc/
+	cp ${PWD}/qemu-patch/huc_msg.h ${HOME}/src/huc-qemu/hw/misc/
+	echo 'common-obj-$(CONFIG_HUCDEV) += hucdev.o' >> ${HOME}/src/huc-qemu/hw/misc/Makefile.objs
+
 compile qemu
 
 	make qemu
@@ -78,14 +86,15 @@ compile qemu
 Run qemu
 
 	/usr/local/bin/qemu-system-x86_64 \
+			-name huc,debug-threads=on \
 			-serial mon:stdio \
-			-drive file=ubt2004.qcow2,format=qcow2 \
+			-drive file=./huc.qcow2,format=qcow2 \
 			-enable-kvm -m 2G -smp 2 \
 			-device e1000,netdev=ssh \
 			-netdev user,id=ssh,hostfwd=tcp::2222-:22 \
 			-vnc 0.0.0.0:0 \
 			-virtfs local,id=sfs,path=/root/huc,security_model=passthrough,mount_tag=shared \
-			-device newdev -device hucdev
+			-device hucdev
 
 ## 准备内核代码(tag 5.4)
 

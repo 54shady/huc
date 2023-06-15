@@ -6,17 +6,26 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 #include <time.h>
+#include <sched.h>
+#include <signal.h>
 
 #include "bpf_injection_msg.h"
 
 #include "bpf_load.h"
 
 #define HUC_DEV_NODE "/dev/hucdev"
+#define MAX_CPU 64
+#define SET_SIZE CPU_ALLOC_SIZE(64)
+#define IOCTL_SCHED_SETAFFINITY 13
+#define IOCTL_PROGRAM_INJECTION_RESULT_READY 14
+
+int isPowerOfTwo(uint64_t n);
+int findPosition(uint64_t n);
+void print_cpu_set_mask(cpu_set_t* set);
+void print_binary_mask(uint64_t value, int len);
 
 /* 从fd中读出bytecode保存到返回值 */
 static struct bpf_injection_msg_t recv_bytecode(int fd)
@@ -107,6 +116,61 @@ static int save_bytecode(const char *path, void *buf, unsigned len)
 	return 0;
 }
 
+int isPowerOfTwo(uint64_t n)
+{
+    return n && (!(n & (n - 1)));
+}
+
+int findPosition(uint64_t n)
+{
+	uint64_t i = 1;
+	int pos = 0;
+
+    if (!isPowerOfTwo(n)) {
+        return -1;
+    }
+    while (!(i & n)) {
+        i = i << 1;
+        ++pos;
+    }
+    return pos;
+}
+
+void print_cpu_set_mask(cpu_set_t* set)
+{
+	int i;
+
+	printf("CPU mask set on cpus:");
+
+	for (i = 0; i < MAX_CPU; i++) {
+		if (CPU_ISSET_S(i, SET_SIZE, set)) {
+            printf(" %d", i);
+        }
+    }
+    printf("\n");
+}
+
+void print_binary_mask(uint64_t value, int len)
+{
+	uint64_t flag;
+	int i;
+
+	if (len > 8) {
+		return;
+	}
+	for (i = 0; i < (len * 8); i++) {
+		flag = 1;
+		flag = flag << i;
+		if (value & flag) {
+			printf("1");
+		}
+		else {
+			printf("0");
+		}
+	}
+	printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
 	struct bpf_injection_msg_t mymsg;
@@ -191,11 +255,50 @@ int main(int argc, char *argv[])
 
 				while (1)
 				{
+					int i;
+					cpu_set_t *set;
+					int cpu_index;
+
 					nanosleep(&ts, NULL);
+
 					/* 用户态使用libbpf里的bpf call linux/tools/lib/bpf/bpf.c */
-					bpf_map_lookup_elem(map_fd[0], &index, &value);
-					/* child main loop do something */
-					printf("Index_%u = %ld\n", index, value);
+					bpf_map_lookup_elem(map_fd[0], &index, &value); /* count for 0 */
+					if (value != 0)
+					{
+						set = CPU_ALLOC(MAX_CPU);
+						/* count from 1, cuz 0 is count above */
+						for (i = MAX_CPU; i > 0; i--)
+						{
+							bpf_map_lookup_elem(map_fd[0], &i, &value);
+							if (value != 0)
+							{
+								memcpy(set, &value, SET_SIZE);
+								cpu_index = findPosition(value);
+								printf("Index_%02u = %ld, cindex = %d\n", i,
+										value, cpu_index);
+
+								print_cpu_set_mask(set);
+								printf("Binary mask: ");
+								print_binary_mask(value, 2);
+								if (isPowerOfTwo(value)) {
+									printf("CPU mask refers to one cpu only: cpu #%d\n", cpu_index);
+								}
+								else {
+									printf("CPU mask refers to multiple cpus.\n");
+								}
+
+								/* 根据从bpf map中读取的值来设置cpu mask */
+								printf("Set cpu mask %ld>>>\n", value);
+								ioctl(fd, IOCTL_SCHED_SETAFFINITY, &value);
+								value = 0;
+								index = i;
+								bpf_map_update_elem(map_fd[0], &index, &value, BPF_ANY);
+							}
+						}
+						CPU_FREE(set);
+						index = 0;
+						bpf_map_update_elem(map_fd[0], &index, &value, BPF_ANY);
+					}
 					/* value += 2; */
 					/* bpf_map_update_elem(map_fd[0], &index, &value, BPF_ANY); */
 				}

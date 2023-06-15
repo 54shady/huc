@@ -34,10 +34,15 @@
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
 #define MAX_ENTRIES 64
 
-// Using BPF_MAP_TYPE_ARRAY map type all array elements pre-allocated
-// and zero initialized at init time
-/* bpf_map name values */
-struct bpf_map_def SEC("maps") values = {
+/*
+ * Using BPF_MAP_TYPE_ARRAY map type all array elements pre-allocated
+ * and zero initialized at init time
+ *
+ * bpfmap name : cpuindex_mask_maps
+ * @key: cpu index
+ * @value: cpu mask
+ */
+struct bpf_map_def SEC("maps") cpuindex_mask_maps = {
 	.type = BPF_MAP_TYPE_ARRAY,
 	.key_size = sizeof(u32),
 	.value_size = sizeof(u64),
@@ -56,19 +61,19 @@ struct bpf_map_def SEC("maps") values = {
 SEC("kprobe/sched_setaffinity")
 int bpf_prog1(struct pt_regs *ctx){
 	int ret;
-	// int pid;
 	u64 cpu_set;
 	u64 *top;
 	u32 index = 0;
 	int pid;
-	char msg[] = "Pid %d Enter\n";
-	char vi[] = "index: %d\n";
+	char msg[] = "Set vcpu%d mask to %lu\n";
 
-	pid = bpf_get_current_pid_tgid();
-	bpf_trace_printk(msg, sizeof(msg), pid);
-
-	char fmt[] = "cpu_set %lu\n";
-	bpf_trace_printk(fmt, sizeof(fmt), cpu_set);
+	/*
+	 * no need to get pid info, bpf already done this yet
+	 *
+	 * char msg[] = "Pid %d Enter\n";
+	 * pid = bpf_get_current_pid_tgid();
+	 * bpf_trace_printk(msg, sizeof(msg), pid);
+	 */
 
 	/*
 	 * System call prototype:
@@ -94,11 +99,13 @@ int bpf_prog1(struct pt_regs *ctx){
 	 *
 	 * 利用宏PT_REGS_PARMN来获取内核函数的第N个参数
 	 * 参看tools/testing/selftests/bpf/bpf_helpers.h
+	 *
+	 * 内核中有程序通过调用了CPU_SET或sched_setaffinity设置了cpu mask
+	 * 在bytecode中读取guest应用层设置的值(在cpu_set)
 	 */
 	ret = bpf_probe_read(&cpu_set, 8, (void*)PT_REGS_PARM2(ctx));
 
-	/* 猜测: 内核中主动的调核导致这里的cpu index的mask值变化 */
-	top = bpf_map_lookup_elem(&values, &index);
+	top = bpf_map_lookup_elem(&cpuindex_mask_maps, &index);
 	if (!top) {
 		return 0;
 	}
@@ -110,14 +117,20 @@ int bpf_prog1(struct pt_regs *ctx){
 	__sync_fetch_and_add(top, 1);
 
 	index = *top;
-	// bpf_trace_printk(fmt, sizeof(fmt), cpu_set);
-	bpf_trace_printk(vi, sizeof(vi), index);
+	bpf_trace_printk(msg, sizeof(msg), index, cpu_set);
 
-	/* 内核中使用bpf call: kernel/bpf/helpers.c */
-	bpf_map_update_elem(&values, &index, &cpu_set, 0);
+	/*
+	 * 内核中使用bpf call: kernel/bpf/helpers.c
+	 *
+	 * 将cpu_set更新到bpfmap中去,这样daemon程序就能根据该值的变化
+	 * 将数据传递到虚拟设备,让虚拟设备来实现设置cpu亲和性
+	 */
+	bpf_map_update_elem(&cpuindex_mask_maps, &index, &cpu_set, 0);
 
     return 0;
 }
 
 char _license[] SEC("license") = "GPL";
-u32 _version SEC("version") = LINUX_VERSION_CODE;		//Useful because kprobe is NOT a stable ABI. (wrong version fails to be loaded)
+
+/* Useful because kprobe is NOT a stable ABI. (wrong version fails to be loaded) */
+u32 _version SEC("version") = LINUX_VERSION_CODE;
